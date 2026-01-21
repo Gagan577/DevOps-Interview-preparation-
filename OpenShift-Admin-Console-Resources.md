@@ -93,15 +93,15 @@
 ## Overview
 
 ### Definition
-- Central dashboard showing cluster health, resource utilization, and alerts at a glance
-- Entry point for administrators to assess cluster state quickly
+- This is the first thing I check every morning—it's basically your cluster's heartbeat monitor showing health, alerts, and resource consumption in one place
+- Think of it as the cockpit view; if something's wrong anywhere in the cluster, you'll see red flags here first
 
 ### Why It Is Used
-- Provides immediate visibility into cluster health, capacity, and critical alerts for rapid triage.
+- In production, I use this to quickly triage before touching anything—saves me from blindly deploying into a cluster that's already on fire.
 
 ### Use Cases
-- Quick health check before deployments
-- Identifying resource pressure across nodes
+- Morning sanity check before rolling out changes—are nodes healthy? Any firing alerts?
+- When on-call gets paged at 2 AM, this is where you land first to assess blast radius
 
 ### Important CLI Commands
 ```bash
@@ -121,15 +121,15 @@ oc adm top nodes
 ## Dashboards
 
 ### Definition
-- Pre-built and customizable views for monitoring cluster metrics, workloads, and infrastructure
-- Backed by Prometheus and Grafana for visualization
+- Grafana-style dashboards powered by Prometheus—this is where you go beyond "is it up" to "why is it slow"
+- I've spent hours here correlating CPU spikes with deployment times to prove it wasn't my code causing issues
 
 ### Why It Is Used
-- Enables proactive monitoring and capacity planning through visual metric representation.
+- When leadership asks "how's the cluster performing this quarter?", these dashboards give you the data to back up your capacity planning requests.
 
 ### Use Cases
-- Monitoring CPU/memory trends over time
-- Tracking pod restart rates and error patterns
+- Tracking memory trends to justify adding more worker nodes before Black Friday traffic
+- Correlating pod restart spikes with specific deployments—caught a memory leak this way once
 
 ### Important CLI Commands
 ```bash
@@ -158,15 +158,15 @@ data:
 ## Nodes
 
 ### Definition
-- Worker or control-plane machines that run containerized workloads
-- Fundamental compute units managed by OpenShift scheduler
+- These are your actual VMs or bare-metal servers running the workloads—workers run your apps, masters run the control plane
+- Every pod you deploy ultimately lands on a node; if nodes are unhealthy, nothing else matters
 
 ### Why It Is Used
-- Nodes provide the actual compute, memory, and storage capacity for running pods.
+- You can't troubleshoot scheduling issues without understanding node capacity. "Pending" pods? First thing I check is node resource pressure.
 
 ### Use Cases
-- Scaling cluster capacity by adding nodes
-- Cordoning nodes for maintenance
+- Cordoning a node before patching—learned the hard way that draining without cordoning first causes pods to reschedule back
+- Labeling nodes for workload isolation—we run GPU workloads on specific nodes using node selectors
 
 ### Important CLI Commands
 ```bash
@@ -195,15 +195,15 @@ metadata:
 ## Machines
 
 ### Definition
-- Represents a single machine instance provisioned by the Machine API
-- Maps 1:1 with underlying infrastructure VMs or bare-metal servers
+- The Machine object is OpenShift's view of the underlying infrastructure—it's the glue between your cloud provider's VM and the Kubernetes node
+- When a node shows "NotReady", I always check the Machine status because the problem might be at the infrastructure layer, not Kubernetes
 
 ### Why It Is Used
-- Provides infrastructure-level abstraction for automated node provisioning and lifecycle management.
+- Debugging "why won't my new node come up" almost always involves looking at Machine status and events—it tells you if the VM even got created.
 
 ### Use Cases
-- Investigating node provisioning failures
-- Correlating node issues with underlying machine state
+- Node stuck in provisioning? Check if the Machine is waiting on cloud API rate limits or quota issues
+- Correlating intermittent node failures with underlying VM health checks failing on AWS/Azure
 
 ### Important CLI Commands
 ```bash
@@ -233,15 +233,15 @@ spec:
 ## MachineSets
 
 ### Definition
-- Controller that maintains a desired count of Machines
-- Similar to ReplicaSet but for infrastructure nodes
+- Think of it as a ReplicaSet but for infrastructure—you say "I want 5 workers in us-east-1a" and it maintains that count
+- This is how you scale your cluster without manually provisioning VMs; change the replica count and machines appear
 
 ### Why It Is Used
-- Enables horizontal scaling of worker nodes with consistent configuration across availability zones.
+- Autoscaling and disaster recovery depend on MachineSets. If a node dies, the MachineSet spins up a replacement automatically.
 
 ### Use Cases
-- Scaling worker pool from 3 to 6 nodes
-- Creating dedicated node pools for specific workloads (infra, GPU)
+- Creating a separate MachineSet for infra nodes so router and monitoring pods don't compete with app workloads
+- Scaling up before a big release, then scaling back down after—saved significant cloud costs this way
 
 ### Important CLI Commands
 ```bash
@@ -278,16 +278,15 @@ spec:
 ## MachineConfigs
 
 ### Definition
-- Defines OS-level configuration applied to nodes via Machine Config Operator (MCO)
-- Controls systemd units, files, kernel arguments, and container runtime settings
+- This is how you touch the RHCOS operating system—need to add a CA cert, change a kernel parameter, or modify kubelet config? MachineConfig is your answer
+- Fair warning: applying a MachineConfig triggers a rolling reboot of all nodes in that pool, so plan your maintenance windows
 
 ### Why It Is Used
-- Ensures consistent, declarative OS configuration across all nodes in a MachineConfigPool.
+- Security team says "add our corporate CA to all nodes"—MachineConfig is the only supported way to do this without breaking cluster upgrades.
 
 ### Use Cases
-- Adding custom CA certificates to nodes
-- Configuring kernel parameters (sysctl)
-- Setting up chrony for NTP
+- Setting vm.max_map_count for Elasticsearch—without this, ES pods crash on startup
+- Adding custom chrony config because the default NTP servers weren't reachable in our air-gapped environment
 
 ### Important CLI Commands
 ```bash
@@ -325,15 +324,15 @@ spec:
 ## Pods
 
 ### Definition
-- Smallest deployable unit containing one or more containers
-- Ephemeral by design; managed by higher-level controllers
+- The atomic unit of deployment—one or more containers sharing network and storage. But here's the thing: you almost never create pods directly
+- Pods are cattle, not pets. They die, get evicted, OOMKilled—that's normal. Your job is to make sure the controllers recreate them properly
 
 ### Why It Is Used
-- Pods execute application containers with shared networking and storage context.
+- When something breaks, you're looking at pod logs, describing pods for events, exec'ing in to check filesystem state. This is where debugging lives.
 
 ### Use Cases
-- Debugging container crashes via logs
-- Exec into pod for troubleshooting
+- Pod stuck in CrashLoopBackOff? Check logs, then previous logs (--previous flag is your friend for containers that restart)
+- Exec into a pod to verify it can reach the database—faster than setting up tcpdump
 
 ### Important CLI Commands
 ```bash
@@ -372,16 +371,15 @@ spec:
 ## Deployments
 
 ### Definition
-- Kubernetes-native controller for declarative pod management with rolling updates
-- Manages ReplicaSets to ensure desired pod count
+- The workhorse for stateless apps—you declare the desired state, it figures out how to get there with rolling updates
+- Under the hood, it creates ReplicaSets. Each rollout = new ReplicaSet. That's how rollback works—it just scales the old RS back up
 
 ### Why It Is Used
-- Standard method for deploying stateless applications with zero-downtime updates.
+- 90% of our apps use Deployments. It handles rolling updates, rollbacks, and scaling without me writing custom logic.
 
 ### Use Cases
-- Rolling out new application versions
-- Scaling application replicas
-- Rollback to previous revision
+- Rollback saved us during a bad release—one command and we're back to the previous version in seconds
+- Set maxUnavailable to 0 for zero-downtime deploys; learned this after accidentally taking down production during a rollout
 
 ### Important CLI Commands
 ```bash
@@ -435,15 +433,15 @@ spec:
 ## DeploymentConfigs
 
 ### Definition
-- OpenShift-specific deployment controller with integrated triggers and lifecycle hooks
-- Predates Kubernetes Deployments; still used for ImageStream triggers
+- OpenShift's original deployment mechanism—older than Kubernetes Deployments but has unique features like ImageStream triggers
+- Honestly, we're migrating away from DCs to Deployments, but legacy apps still use them and you'll see them in older clusters
 
 ### Why It Is Used
-- Enables automatic deployments triggered by ImageStream changes or ConfigMap updates.
+- The killer feature is ImageStream triggers—push a new image and DC automatically rolls out. No CI/CD webhook needed.
 
 ### Use Cases
-- Auto-deploy when new image is pushed to ImageStream
-- Running pre/post deployment hooks
+- Legacy apps that rely on automatic rollouts when base images update in ImageStreams
+- Running database migrations in lifecycle hooks before the new version starts accepting traffic
 
 ### Important CLI Commands
 ```bash
@@ -495,15 +493,15 @@ spec:
 ## ReplicaSets
 
 ### Definition
-- Ensures a specified number of pod replicas are running at all times
-- Managed automatically by Deployments; rarely created directly
+- The controller that actually maintains your pod count—Deployments create these, you rarely touch them directly
+- Each deployment revision creates a new ReplicaSet. Old ones stick around (scaled to 0) for rollback capability
 
 ### Why It Is Used
-- Provides self-healing capability by replacing failed pods automatically.
+- When a rollout is stuck, looking at ReplicaSet events tells you why the new pods aren't coming up—usually image pull issues or resource constraints.
 
 ### Use Cases
-- Investigating stuck rollouts
-- Understanding deployment revision history
+- Debugging stuck deployments—RS events show "FailedCreate" with the actual error message
+- Cleaning up old ReplicaSets to reduce etcd bloat in clusters with frequent deployments
 
 ### Important CLI Commands
 ```bash
@@ -540,15 +538,15 @@ spec:
 ## ReplicationControllers
 
 ### Definition
-- Legacy pod replication controller predating ReplicaSets
-- Used internally by DeploymentConfigs
+- The OG replication controller—superseded by ReplicaSets but still powers DeploymentConfigs under the hood
+- If you're managing a cluster with old workloads, you'll see these. New clusters? Probably never
 
 ### Why It Is Used
-- Maintains backward compatibility with DeploymentConfig-based workloads.
+- DeploymentConfigs create RCs, so when debugging DC rollouts, you end up looking at RC status and events.
 
 ### Use Cases
-- Troubleshooting DeploymentConfig rollout issues
-- Migrating legacy workloads to Deployments
+- Stuck DC rollout? Check the RC events for the real error—usually quota exceeded or image pull failures
+- Migration projects: identifying workloads still using DC/RC that need to move to Deployment/RS
 
 ### Important CLI Commands
 ```bash
@@ -584,15 +582,15 @@ spec:
 ## StatefulSets
 
 ### Definition
-- Controller for stateful applications requiring stable network identity and persistent storage
-- Pods are created sequentially with predictable names (app-0, app-1, app-2)
+- For apps that care about identity—databases, Kafka, anything that says "I'm node-0 and I need to stay node-0"
+- Pods get sticky names (myapp-0, myapp-1) and dedicated PVCs that follow them through restarts. Deployments can't do this
 
 ### Why It Is Used
-- Essential for databases, message queues, and clustered applications needing ordered deployment.
+- You can't run a proper database cluster with Deployments. StatefulSets give you ordered startup, stable DNS, and persistent storage per pod.
 
 ### Use Cases
-- Running PostgreSQL/MySQL clusters
-- Deploying Kafka or Elasticsearch
+- Running a 3-node PostgreSQL cluster where each node needs its own persistent volume and predictable hostname for replication
+- Kafka brokers that need stable network identity so partitions don't get reassigned on every pod restart
 
 ### Important CLI Commands
 ```bash
@@ -645,15 +643,15 @@ spec:
 ## DaemonSets
 
 ### Definition
-- Ensures a pod runs on all (or selected) nodes in the cluster
-- Automatically schedules pods on new nodes as they join
+- "Run this pod on every node"—that's it. Perfect for agents that need to be everywhere: logging, monitoring, security scanning
+- Add a new node? DaemonSet automatically schedules a pod there. No manual intervention needed
 
 ### Why It Is Used
-- Ideal for node-level services like log collectors, monitoring agents, and network plugins.
+- Node-level concerns like log forwarding, metrics collection, and security agents have to run on every node. DaemonSet is the only way to guarantee that.
 
 ### Use Cases
-- Deploying Fluentd/Fluent Bit for log aggregation
-- Running node monitoring agents (node-exporter)
+- Fluentd on every node shipping logs to Splunk—missing a node means missing logs, which means audit failures
+- Node-exporter for Prometheus—without it on every node, your monitoring dashboards have blind spots
 
 ### Important CLI Commands
 ```bash
@@ -699,16 +697,15 @@ spec:
 ## Jobs
 
 ### Definition
-- Runs a pod to completion for batch processing tasks
-- Ensures successful completion with configurable retry policy
+- "Run this once and make sure it finishes"—unlike Deployments that keep pods running forever, Jobs are for tasks with an end
+- It'll retry on failure (configurable), and you can run multiple pods in parallel for batch processing
 
 ### Why It Is Used
-- Executes one-off or batch tasks that must run to completion.
+- Database migrations, data imports, one-time cleanups—anything that shouldn't run continuously but needs Kubernetes' scheduling and retry logic.
 
 ### Use Cases
-- Database migrations
-- Batch data processing
-- Backup operations
+- Database migrations as part of deployment pipeline—Job runs before the new app version starts
+- Bulk data processing: spin up 10 parallel pods to process a queue, Job completes when all items are done
 
 ### Important CLI Commands
 ```bash
@@ -748,16 +745,15 @@ spec:
 ## CronJobs
 
 ### Definition
-- Schedules Jobs to run periodically based on cron expressions
-- Creates Job objects at scheduled times
+- Cron for Kubernetes—schedule Jobs to run at specific times using standard cron syntax
+- Each execution creates a new Job object. Watch out for overlap if your job takes longer than the schedule interval
 
 ### Why It Is Used
-- Automates recurring tasks like backups, report generation, and cleanup operations.
+- Backups at 2 AM, daily report generation, weekly cleanup—anything you'd put in crontab but want Kubernetes to manage.
 
 ### Use Cases
-- Nightly database backups
-- Periodic cache cleanup
-- Scheduled report generation
+- Nightly database backups with `concurrencyPolicy: Forbid` so a slow backup doesn't cause two running simultaneously
+- Hourly cleanup job that prunes old data—`failedJobsHistoryLimit` keeps failed runs around for debugging
 
 ### Important CLI Commands
 ```bash
@@ -798,15 +794,15 @@ spec:
 ## PodDisruptionBudgets
 
 ### Definition
-- Limits voluntary disruptions to ensure minimum pod availability during maintenance
-- Protects application availability during node drains and upgrades
+- Your safety net during cluster maintenance—tells Kubernetes "you can't evict pods if it would drop us below X available replicas"
+- Without PDBs, a node drain can take down all your pods at once. Ask me how I learned this lesson
 
 ### Why It Is Used
-- Prevents service outages during cluster maintenance by enforcing minimum available replicas.
+- Cluster upgrades drain nodes one by one. PDB ensures your app stays up by blocking drains that would cause outage.
 
 ### Use Cases
-- Protecting critical services during node upgrades
-- Ensuring HA during voluntary pod evictions
+- Critical payment service with PDB requiring minAvailable: 2—upgrade can't proceed if it would leave us with 1 pod
+- Learned to always create PDBs after an upgrade took down all 3 replicas because they were on the same node
 
 ### Important CLI Commands
 ```bash
@@ -849,15 +845,15 @@ spec:
 ## Services
 
 ### Definition
-- Stable network endpoint that load balances traffic to a set of pods
-- Provides service discovery via DNS within the cluster
+- The stable front door to your pods—pods come and go, but the Service IP and DNS name stay constant
+- It's basically an internal load balancer. Traffic hits the Service, Service routes to healthy pods. Simple but critical
 
 ### Why It Is Used
-- Abstracts pod IPs and provides reliable internal/external access to applications.
+- Pods get random IPs every restart. Without Services, your apps would need to discover each other constantly. Service DNS (myapp.namespace.svc) solves this.
 
 ### Use Cases
-- Internal service-to-service communication
-- Exposing applications via LoadBalancer or NodePort
+- ClusterIP for internal communication—frontend talks to backend-service, not individual pod IPs
+- Headless Service (clusterIP: None) for StatefulSets where each pod needs direct addressability
 
 ### Important CLI Commands
 ```bash
@@ -906,16 +902,15 @@ spec:
 ## Routes
 
 ### Definition
-- OpenShift-native resource for exposing services externally via HTTP/HTTPS
-- Managed by the OpenShift Router (HAProxy-based)
+- OpenShift's way of exposing apps to the outside world—creates a hostname like myapp.apps.cluster.example.com
+- Under the hood, it's HAProxy handling TLS termination, path routing, and traffic splitting. Production-grade ingress out of the box
 
 ### Why It Is Used
-- Provides external access with TLS termination, path-based routing, and traffic splitting.
+- Need external HTTPS access with automatic cert management? Route + OpenShift's built-in router handles it without deploying nginx-ingress or traefik.
 
 ### Use Cases
-- Exposing web applications externally
-- Blue-green deployments with traffic splitting
-- TLS termination at edge
+- Edge TLS termination with auto-redirect from HTTP—one YAML and you have secure external access
+- A/B testing: split traffic 90/10 between v1 and v2 using alternateBackends. Real canary deployments without service mesh
 
 ### Important CLI Commands
 ```bash
@@ -967,15 +962,15 @@ spec:
 ## Ingresses
 
 ### Definition
-- Kubernetes-native resource for HTTP/HTTPS routing to services
-- Processed by OpenShift Ingress Controller to create Routes
+- Standard Kubernetes ingress resource—OpenShift automatically converts these to Routes behind the scenes
+- Useful when you're migrating from vanilla Kubernetes or using Helm charts that expect Ingress resources
 
 ### Why It Is Used
-- Provides cross-platform compatibility for external access configuration.
+- Portability: same YAML works on OpenShift and other K8s distros. Good for multi-cloud or hybrid scenarios.
 
 ### Use Cases
-- Multi-path routing to different services
-- Migrating workloads from other Kubernetes distributions
+- Running Helm charts that create Ingress objects—they just work on OpenShift, no modification needed
+- Team familiar with Ingress from GKE/EKS can use same patterns; OpenShift handles the translation to Routes
 
 ### Important CLI Commands
 ```bash
@@ -1020,15 +1015,15 @@ spec:
 ## NetworkPolicies
 
 ### Definition
-- Controls pod-to-pod and external traffic using label selectors
-- Default-deny model when policies are applied to a namespace
+- Firewall rules for pods—without them, every pod can talk to every other pod. That's a security audit failure waiting to happen
+- Once you apply any NetworkPolicy to a namespace, it becomes default-deny for that traffic type. Whitelist model
 
 ### Why It Is Used
-- Implements microsegmentation and zero-trust networking for security compliance.
+- Compliance requires network segmentation. NetworkPolicies prove to auditors that your database isn't exposed to the entire cluster.
 
 ### Use Cases
-- Isolating namespaces from each other
-- Restricting database access to specific application pods
+- Database pods only accepting connections from specific app pods—even if someone deploys a rogue pod, it can't reach the DB
+- Namespace isolation: production namespace can't talk to development, preventing accidental cross-environment calls
 
 ### Important CLI Commands
 ```bash
@@ -1077,15 +1072,15 @@ spec:
 ## Endpoints
 
 ### Definition
-- Lists IP addresses and ports of pods backing a Service
-- Automatically managed by endpoint controller based on Service selector
+- The actual list of pod IPs behind a Service—Kubernetes maintains this automatically based on which pods match the Service selector
+- When you can't reach a service, checking Endpoints tells you if any pods are actually backing it
 
 ### Why It Is Used
-- Enables debugging of service connectivity and understanding pod-to-service mapping.
+- "Service exists but returns 503"—first check Endpoints. Empty or missing IPs means selector doesn't match any running pods.
 
 ### Use Cases
-- Verifying pods are correctly registered with a Service
-- Debugging service connectivity issues
+- Debugging service connectivity: "why can't I reach my app?"—Endpoints shows 0 addresses, pods have wrong labels
+- Manually creating Endpoints for external services—makes external database look like an in-cluster service to your apps
 
 ### Important CLI Commands
 ```bash
@@ -1127,15 +1122,15 @@ spec:
 ## PersistentVolumes
 
 ### Definition
-- Cluster-wide storage resource provisioned by admin or dynamically via StorageClass
-- Lifecycle independent of pods; can be retained or recycled
+- The actual storage provisioned in your infrastructure—could be AWS EBS, Azure Disk, NFS, whatever your cluster supports
+- PVs exist at cluster scope, not namespace. They get bound to PVCs when a claim matches their capacity and access mode
 
 ### Why It Is Used
-- Provides durable storage that persists beyond pod lifecycle for stateful workloads.
+- Stateful apps need storage that survives pod restarts. PVs are that durable storage layer decoupled from pod lifecycle.
 
 ### Use Cases
-- Provisioning storage for databases
-- Managing storage lifecycle (retain, delete)
+- Investigating "Pending" PVCs—check if a PV with matching specs exists or if dynamic provisioning is configured
+- Setting reclaimPolicy to Retain for databases—you don't want to accidentally delete production data when someone deletes the PVC
 
 ### Important CLI Commands
 ```bash
@@ -1169,15 +1164,15 @@ spec:
 ## PersistentVolumeClaims
 
 ### Definition
-- Request for storage by a user/application specifying size and access mode
-- Binds to available PV or triggers dynamic provisioning
+- Developer's request for storage—"I need 10Gi of fast storage"—without caring if it's EBS, Azure Disk, or NFS
+- PVC either binds to an existing PV or triggers dynamic provisioning via StorageClass. Either way, developer gets their volume
 
 ### Why It Is Used
-- Allows applications to request storage without knowing underlying infrastructure details.
+- Abstracts storage infrastructure from application teams. They request what they need; platform team handles the backend.
 
 ### Use Cases
-- Requesting storage for application data
-- Expanding volume size (if StorageClass supports)
+- PVC stuck in Pending? Either no matching PV exists, StorageClass can't provision, or you hit quota limits
+- Expanding PVC online without downtime—if StorageClass supports it, just patch the spec.resources.requests.storage
 
 ### Important CLI Commands
 ```bash
@@ -1209,15 +1204,15 @@ spec:
 ## StorageClasses
 
 ### Definition
-- Defines storage provisioner and parameters for dynamic PV creation
-- Enables self-service storage provisioning for developers
+- Your storage menu—defines different storage tiers with different performance characteristics and provisioners
+- When a PVC references a StorageClass, it triggers dynamic provisioning. No admin intervention needed per request
 
 ### Why It Is Used
-- Automates storage provisioning and standardizes storage tiers across the cluster.
+- Self-service storage: developers pick "fast-ssd" or "cheap-hdd" StorageClass, platform provisions automatically. Scales without you being a bottleneck.
 
 ### Use Cases
-- Defining storage tiers (fast SSD, standard HDD)
-- Enabling volume expansion and snapshot support
+- Default StorageClass for general workloads, premium class for databases needing IOPS guarantees
+- WaitForFirstConsumer binding mode—delays provisioning until pod is scheduled, ensures volume is in the right availability zone
 
 ### Important CLI Commands
 ```bash
@@ -1251,15 +1246,15 @@ volumeBindingMode: WaitForFirstConsumer
 ## VolumeSnapshots
 
 ### Definition
-- Point-in-time copy of a PersistentVolumeClaim for backup or cloning
-- Requires CSI driver with snapshot support
+- Point-in-time backup of a PVC at the storage layer—much faster than copying data because it's typically copy-on-write
+- You can create a new PVC from a snapshot, essentially cloning your data instantly
 
 ### Why It Is Used
-- Enables backup, disaster recovery, and rapid provisioning from existing data.
+- Pre-upgrade database backups, cloning prod data to test environment, disaster recovery—all without application downtime.
 
 ### Use Cases
-- Creating database backups before upgrades
-- Cloning production data for testing
+- Snapshot before database migration—if migration fails, restore from snapshot instead of waiting for backup restore
+- "Clone production to staging"—snapshot prod PVC, create new PVC from snapshot in staging namespace
 
 ### Important CLI Commands
 ```bash
@@ -1307,15 +1302,15 @@ spec:
 ## BuildConfigs
 
 ### Definition
-- Defines how to build container images from source code in OpenShift
-- Supports Source-to-Image (S2I), Docker, and Pipeline strategies
+- OpenShift's built-in CI—point it at Git repo, it builds your image using S2I, Dockerfile, or pipeline strategy
+- No need for external Jenkins or GitHub Actions just to build images. BuildConfig does it inside the cluster with full access to internal registries
 
 ### Why It Is Used
-- Automates CI/CD by building images directly within OpenShift from Git repositories.
+- Reduces external dependencies. Build runs in-cluster, pushes to internal registry, triggers deployment—all without leaving OpenShift.
 
 ### Use Cases
-- Building applications from Git source
-- Triggering builds on code push via webhooks
+- S2I builds for standard frameworks—Node.js app builds without writing a Dockerfile, S2I handles it
+- Webhook triggers: push to main branch, BuildConfig automatically starts building. Instant CI/CD
 
 ### Important CLI Commands
 ```bash
@@ -1364,15 +1359,15 @@ spec:
 ## Builds
 
 ### Definition
-- Instance of a BuildConfig execution that produces a container image
-- Tracks build status, logs, and output artifacts
+- The actual execution of a BuildConfig—one BuildConfig, many Builds over time
+- Each Build has its own logs, status, and output. Failed build? Check Build logs, not BuildConfig
 
 ### Why It Is Used
-- Represents the actual build execution with logs and status for troubleshooting.
+- When build fails, Build object has the logs showing exactly what went wrong—npm install failed, Dockerfile syntax error, whatever.
 
 ### Use Cases
-- Monitoring build progress
-- Debugging failed builds
+- Debugging failed builds: `oc logs build/myapp-15` shows the actual compilation errors
+- Checking which commit triggered which build—useful when tracking down "which build introduced the bug"
 
 ### Important CLI Commands
 ```bash
@@ -1417,15 +1412,15 @@ spec:
 ## ImageStreams
 
 ### Definition
-- Virtual repository that tracks image references and triggers deployments on updates
-- Abstracts external registries and enables image promotion workflows
+- A pointer to images rather than the images themselves—tracks tags across registries and triggers deployments when images change
+- Think of it as a smart alias: myapp:latest in ImageStream can point to different actual images over time, and OpenShift tracks the history
 
 ### Why It Is Used
-- Provides image lifecycle management and automatic deployment triggers on image changes.
+- Image promotion across environments without rebuilding: tag dev image as prod, DeploymentConfig in prod namespace auto-deploys. No rebuild, same tested image.
 
 ### Use Cases
-- Tracking images across environments (dev→staging→prod)
-- Triggering deployments when new images are pushed
+- Scheduled imports from external registry—ImageStream polls Quay.io daily, auto-deploys when base image gets security updates
+- Image promotion: `oc tag dev/myapp:tested prod/myapp:latest` promotes through environments using the same image SHA
 
 ### Important CLI Commands
 ```bash
@@ -1462,15 +1457,15 @@ spec:
 ## ImageStreamTags
 
 ### Definition
-- Specific tagged reference within an ImageStream pointing to an image SHA
-- Immutable pointer to a specific image version
+- A specific version pointer within an ImageStream—myapp:v1.2.0 points to one specific image SHA
+- Unlike mutable Docker tags, you can see exactly which image SHA a tag pointed to at any point in history
 
 ### Why It Is Used
-- Enables version control and promotion of specific image versions across environments.
+- Audit trail: compliance asks "what image was running on January 5th?"—ImageStreamTag history shows the exact SHA.
 
 ### Use Cases
-- Promoting specific builds to production
-- Rolling back to known-good image versions
+- Rolling back by re-tagging: `oc tag myapp@sha256:abc123 myapp:latest` instantly points latest back to a known-good image
+- Tracking which exact image is deployed in each environment—prod:latest might be different SHA than dev:latest
 
 ### Important CLI Commands
 ```bash
@@ -1502,15 +1497,15 @@ tag:
 ## ImageStreamImages
 
 ### Definition
-- Immutable reference to a specific image by SHA digest within an ImageStream
-- Guarantees exact image content regardless of tag changes
+- Reference to image by SHA digest, not tag—absolutely immutable, tags can move but SHA never lies
+- When you need to prove exactly what binary was deployed, ImageStreamImage gives you the cryptographic proof
 
 ### Why It Is Used
-- Provides immutable image references for audit trails and reproducible deployments.
+- Security and compliance: "prove this exact image passed security scan" requires SHA reference, not mutable tag.
 
 ### Use Cases
-- Referencing exact image for compliance
-- Debugging which exact image version was deployed
+- Locking deployments to specific SHA for compliance—no accidental updates when someone pushes to :latest
+- Debugging "works in dev, fails in prod"—compare SHAs to confirm same image or catch tag divergence
 
 ### Important CLI Commands
 ```bash
@@ -1536,15 +1531,15 @@ spec:
 ## Users
 
 ### Definition
-- Represents an authenticated identity in OpenShift
-- Created automatically upon first login via configured identity provider
+- Represents someone who authenticated to the cluster—could be from LDAP, OIDC, HTPasswd, whatever identity provider you configured
+- User objects are created automatically on first login. You manage permissions, not user creation typically
 
 ### Why It Is Used
-- Tracks authenticated users for RBAC assignments and audit logging.
+- RBAC bindings reference Users. "Give John cluster-admin"—you need the User object to bind roles to.
 
 ### Use Cases
-- Managing user access permissions
-- Auditing user activities
+- Auditing who has access: `oc get users` shows everyone who's ever logged in
+- Offboarding: delete User and Identity objects when someone leaves (though usually handled by IdP)
 
 ### Important CLI Commands
 ```bash
@@ -1572,15 +1567,15 @@ identities:
 ## Groups
 
 ### Definition
-- Collection of users for simplified RBAC management
-- Can be synced from external identity providers (LDAP, Active Directory)
+- Collection of users for bulk permission assignment—way easier than binding roles to 50 individual users
+- Can be manually created or synced from LDAP/AD. We sync from Active Directory every hour
 
 ### Why It Is Used
-- Enables role assignment to multiple users simultaneously for efficient access management.
+- Team-based access: "developers" group gets edit on dev namespace, "sre" group gets admin. One binding per team, not per person.
 
 ### Use Cases
-- Granting project access to development teams
-- Syncing groups from corporate LDAP
+- LDAP group sync: AD group "OpenShift-Admins" auto-syncs to OpenShift Group, gets cluster-admin
+- Project onboarding: add team's AD group to namespace with one RoleBinding instead of managing individuals
 
 ### Important CLI Commands
 ```bash
@@ -1609,15 +1604,15 @@ users:
 ## Roles
 
 ### Definition
-- Namespace-scoped set of permissions (verbs on resources)
-- Defines what actions can be performed within a specific namespace
+- A set of permissions scoped to one namespace—"can get/list pods" or "can create deployments"
+- Built-in roles like 'edit' and 'view' cover most cases. Create custom roles for fine-grained control
 
 ### Why It Is Used
-- Implements principle of least privilege within a namespace scope.
+- Least privilege: CI/CD pipeline needs to deploy but shouldn't delete PVCs. Custom Role with only deployment permissions.
 
 ### Use Cases
-- Creating custom application-specific roles
-- Granting deployment-only access to CI/CD service accounts
+- Read-only role for auditors—can view everything but change nothing
+- CI/CD service account role: create/update Deployments and ConfigMaps, nothing else
 
 ### Important CLI Commands
 ```bash
@@ -1648,15 +1643,15 @@ rules:
 ## RoleBindings
 
 ### Definition
-- Grants Role permissions to users, groups, or service accounts within a namespace
-- Links subjects (who) to roles (what permissions)
+- The glue between "who" (User/Group/ServiceAccount) and "what they can do" (Role)
+- Scoped to namespace: RoleBinding in 'production' namespace only grants permissions in 'production'
 
 ### Why It Is Used
-- Assigns namespace-scoped permissions to specific identities.
+- This is how access actually gets granted. Role defines permissions, RoleBinding assigns them to identities.
 
 ### Use Cases
-- Granting developers edit access to their namespace
-- Binding CI/CD service account to deployment role
+- Grant 'developers' group edit access to their namespace: one RoleBinding, whole team has access
+- Cross-namespace service account access: SA in 'cicd' namespace needs to deploy to 'production'—RoleBinding in production references SA from cicd
 
 ### Important CLI Commands
 ```bash
@@ -1692,15 +1687,15 @@ roleRef:
 ## ClusterRoles
 
 ### Definition
-- Cluster-wide set of permissions applicable across all namespaces
-- Includes permissions for cluster-scoped resources (nodes, PVs)
+- Like Roles but cluster-wide—can include permissions for cluster-scoped resources (nodes, PVs) that don't live in namespaces
+- Built-in cluster-admin, cluster-reader, etc. cover most needs. Custom ClusterRoles for operators and specialized access
 
 ### Why It Is Used
-- Defines permissions for cluster administration and cross-namespace access.
+- Some things aren't namespaced: nodes, persistent volumes, CRDs. You need ClusterRole to grant access to these.
 
 ### Use Cases
-- Creating cluster-admin level custom roles
-- Defining roles for operators requiring cluster-wide access
+- Read-only cluster access for monitoring tools: ClusterRole with get/list on nodes, pods across all namespaces
+- Operator ClusterRole: needs to watch CRDs and manage resources cluster-wide
 
 ### Important CLI Commands
 ```bash
@@ -1730,15 +1725,15 @@ rules:
 ## ClusterRoleBindings
 
 ### Definition
-- Grants ClusterRole permissions cluster-wide to subjects
-- Provides access to all namespaces and cluster-scoped resources
+- Binds ClusterRole to subjects with cluster-wide scope—subject gets those permissions everywhere
+- Be careful: ClusterRoleBinding with 'edit' ClusterRole = edit access to ALL namespaces
 
 ### Why It Is Used
-- Assigns cluster-wide administrative permissions to users or service accounts.
+- Platform admins, monitoring systems, operators—anything needing cross-namespace or cluster-scoped access.
 
 ### Use Cases
-- Granting cluster-admin access
-- Binding monitoring service account to view all namespaces
+- Platform team gets cluster-admin via ClusterRoleBinding to their AD group
+- Prometheus ServiceAccount needs to scrape metrics from all namespaces—ClusterRoleBinding to cluster-monitoring-view
 
 ### Important CLI Commands
 ```bash
@@ -1773,15 +1768,15 @@ roleRef:
 ## ServiceAccounts
 
 ### Definition
-- Identity for pods and automated processes within a namespace
-- Automatically mounted token provides API authentication for workloads
+- Identity for pods and automation—when your pod calls the Kubernetes API, it authenticates as its ServiceAccount
+- Every namespace has 'default' SA, but you should create dedicated SAs with minimal permissions per workload
 
 ### Why It Is Used
-- Enables pods to authenticate with Kubernetes API and external services securely.
+- Pods need identity for API access, image pulls, and external service authentication. Never use default SA for production workloads.
 
 ### Use Cases
-- Running CI/CD pipelines with specific permissions
-- Granting pods access to pull images from private registries
+- CI/CD pipeline SA with just enough permissions to deploy to target namespace
+- SA with imagePullSecret for pulling from private registry—link secret to SA, all pods using that SA can pull
 
 ### Important CLI Commands
 ```bash
@@ -1823,15 +1818,15 @@ data:
 ## Projects
 
 ### Definition
-- OpenShift wrapper around Kubernetes namespace with additional metadata
-- Provides multi-tenancy with network isolation and resource quotas
+- OpenShift's enhanced namespace—same isolation as namespace plus display names, descriptions, and self-provisioning support
+- When developers run `oc new-project`, they get a Project. It creates the underlying Namespace automatically
 
 ### Why It Is Used
-- Enables team-based resource isolation with self-service provisioning capabilities.
+- Multi-tenancy: each team gets their Project with quotas and network isolation. Self-service without cluster-admin involvement.
 
 ### Use Cases
-- Creating isolated environments for teams
-- Applying default quotas and network policies
+- Developer self-service: user creates their own project, gets admin on it automatically, stays isolated from others
+- Project templates: auto-apply LimitRanges, NetworkPolicies, default quotas to every new project
 
 ### Important CLI Commands
 ```bash
@@ -1861,15 +1856,15 @@ metadata:
 ## Namespaces
 
 ### Definition
-- Kubernetes-native resource for logical cluster partitioning
-- Provides scope for names and a target for resource quotas
+- The raw Kubernetes isolation boundary—resources in one namespace are separate from another
+- In OpenShift, you usually work with Projects, but system components and operators use Namespaces directly
 
 ### Why It Is Used
-- Provides resource isolation and access control boundaries within the cluster.
+- Isolation: teams can have same-named resources (ConfigMap 'config') in different namespaces without conflict.
 
 ### Use Cases
-- Creating infrastructure namespaces not requiring Project features
-- Managing operator namespaces
+- System namespaces like openshift-monitoring, openshift-ingress—these aren't Projects, they're pure Namespaces
+- Namespace labels for policy targeting: label namespace with 'environment: production', NetworkPolicy can select it
 
 ### Important CLI Commands
 ```bash
@@ -1899,15 +1894,15 @@ metadata:
 ## LimitRanges
 
 ### Definition
-- Defines default and maximum resource limits for containers in a namespace
-- Enforces resource constraints at pod admission time
+- Defaults and constraints for container resources in a namespace—if pod doesn't specify limits, LimitRange sets them
+- Also enforces min/max: "no container can request more than 4 CPU" prevents resource hogging
 
 ### Why It Is Used
-- Prevents resource abuse and ensures fair resource allocation across workloads.
+- Prevents runaway resource consumption and ensures every pod has defined limits. No more "forgot to set limits" causing OOM on shared nodes.
 
 ### Use Cases
-- Setting default CPU/memory limits for all pods
-- Preventing unbounded resource requests
+- Default limits so developers don't have to specify them in every pod spec—reduces YAML boilerplate
+- Max limits to prevent one team from requesting 64GB pods on a 128GB node, hogging half the capacity
 
 ### Important CLI Commands
 ```bash
@@ -1951,15 +1946,15 @@ spec:
 ## ResourceQuotas
 
 ### Definition
-- Limits total resource consumption within a namespace
-- Enforces hard limits on CPU, memory, storage, and object counts
+- Hard limits on total resources a namespace can consume—CPU, memory, storage, object counts
+- Unlike LimitRange (per-container), ResourceQuota is for the whole namespace: "team can use max 20 CPU total"
 
 ### Why It Is Used
-- Ensures fair cluster resource sharing and prevents namespace resource exhaustion.
+- Fair sharing: without quotas, one namespace could consume the entire cluster. Quotas enforce boundaries.
 
 ### Use Cases
-- Limiting total CPU/memory per namespace
-- Controlling number of pods, services, or PVCs
+- Dev namespaces get 10 CPU, 20Gi memory quota; production gets more—prevents dev workloads from starving prod
+- Quota on LoadBalancer services: "max 2 per namespace" prevents cloud cost explosion from accidental LB creation
 
 ### Important CLI Commands
 ```bash
@@ -1993,15 +1988,15 @@ spec:
 ## Events
 
 ### Definition
-- Cluster-generated records of state changes and errors
-- Short-lived (default 1 hour retention) diagnostic information
+- Real-time log of what's happening to your resources—scheduling decisions, image pulls, health check failures, everything
+- Short-lived by default (1 hour), so check them quickly when troubleshooting or set up event forwarding
 
 ### Why It Is Used
-- Provides real-time visibility into resource state changes and error conditions.
+- First place to look when something's wrong. "Pod not starting"—Events tell you it's FailedScheduling due to insufficient memory.
 
 ### Use Cases
-- Debugging pod scheduling failures
-- Investigating image pull errors
+- Pod stuck in Pending? Events show "0/5 nodes available: 5 insufficient memory"—instant diagnosis
+- Image pull failures: Events show "Failed to pull image: unauthorized"—immediately know it's credentials, not network
 
 ### Important CLI Commands
 ```bash
@@ -2026,15 +2021,15 @@ oc get events -A --sort-by=.lastTimestamp
 ## Installed Operators
 
 ### Definition
-- Operators deployed and running in the cluster via OLM
-- Provides application lifecycle management automation
+- Operators running in your cluster managed by OLM (Operator Lifecycle Manager)
+- They watch for CRs and reconcile state—you create a PostgresCluster CR, PostgreSQL operator provisions the actual cluster
 
 ### Why It Is Used
-- Automates complex application deployment, scaling, and management tasks.
+- Day 2 operations automation: patching, backups, scaling handled by operator logic instead of manual runbooks.
 
 ### Use Cases
-- Managing database operators (PostgreSQL, MongoDB)
-- Deploying monitoring stack (Prometheus, Grafana)
+- Elasticsearch operator: create one CR, get a production-ready ES cluster with proper node roles and persistent storage
+- Cert-manager operator: handles Let's Encrypt certificate rotation automatically
 
 ### Important CLI Commands
 ```bash
@@ -2065,15 +2060,15 @@ spec:
 ## OperatorHub
 
 ### Definition
-- Marketplace for discovering and installing Operators from multiple sources
-- Aggregates Red Hat, certified, community, and custom catalogs
+- App store for operators—browse, search, and install operators from Red Hat, certified vendors, and community
+- Backed by CatalogSources that define what's available. Disable sources you don't want users installing from
 
 ### Why It Is Used
-- Provides centralized discovery and installation of cluster capabilities.
+- One-click operator installation with dependency resolution. Need monitoring? Install Prometheus operator from OperatorHub.
 
 ### Use Cases
-- Discovering available operators for specific use cases
-- Installing certified third-party operators
+- Finding the right operator: search "kafka", compare Red Hat AMQ Streams vs Strimzi community operator
+- Air-gapped clusters: mirror OperatorHub content to internal registry, create custom CatalogSource pointing to it
 
 ### Important CLI Commands
 ```bash
@@ -2095,15 +2090,15 @@ oc get packagemanifest elasticsearch-operator -o jsonpath='{.status.channels[*].
 ## Subscriptions
 
 ### Definition
-- Declares intent to install and keep an Operator updated
-- Specifies source catalog, channel, and approval strategy
+- Your intent to install and maintain an operator—specifies which operator, from which catalog, on which update channel
+- Subscription watches for updates; when new version appears in channel, it creates an InstallPlan
 
 ### Why It Is Used
-- Enables declarative operator installation with controlled update policies.
+- Declarative operator management: "I want Elasticsearch operator on stable channel, approve updates manually."
 
 ### Use Cases
-- Installing operators with automatic updates
-- Pinning operator to specific version channel
+- Manual approval for production: set `installPlanApproval: Manual`, review changes before operator updates
+- Automatic updates for dev/test: `installPlanApproval: Automatic`, always on latest version in channel
 
 ### Important CLI Commands
 ```bash
@@ -2138,15 +2133,15 @@ spec:
 ## CatalogSources
 
 ### Definition
-- Defines a repository of operators available for installation
-- Points to container image containing operator metadata
+- Defines where OLM finds operators—points to a container image containing operator metadata and bundle references
+- Default CatalogSources pull from internet. Air-gapped? Create your own pointing to mirrored content
 
 ### Why It Is Used
-- Enables custom operator catalogs for air-gapped environments or internal operators.
+- Customization and air-gap support: add internal operators, mirror Red Hat catalogs, disable community sources.
 
 ### Use Cases
-- Adding custom operator catalogs
-- Mirroring Red Hat catalogs for disconnected clusters
+- Air-gapped install: mirror redhat-operators to internal registry, create CatalogSource pointing there
+- Internal operators: package your custom operator, publish to internal catalog, install via OperatorHub like any other
 
 ### Important CLI Commands
 ```bash
@@ -2178,15 +2173,15 @@ spec:
 ## ClusterServiceVersions
 
 ### Definition
-- Defines a specific operator version with its deployment and RBAC requirements
-- Contains install strategy, owned CRDs, and dependency information
+- The installed version of an operator—contains the deployment spec, RBAC requirements, and CRDs it manages
+- CSV status tells you if operator is healthy: "Succeeded" means running, "Failed" means check events for errors
 
 ### Why It Is Used
-- Provides versioned operator metadata for OLM to manage operator lifecycle.
+- Troubleshooting operator issues: CSV status and events show why operator isn't starting—usually RBAC or resource constraints.
 
 ### Use Cases
-- Checking operator version and status
-- Troubleshooting operator installation failures
+- Operator stuck "Installing"? Describe CSV, check events for the actual error
+- Verifying operator version: CSV name includes version (myoperator.v1.2.3)
 
 ### Important CLI Commands
 ```bash
@@ -2231,15 +2226,15 @@ spec:
 ## CustomResourceDefinitions
 
 ### Definition
-- Extends Kubernetes API with custom resource types
-- Defines schema, validation, and versioning for custom objects
+- How you extend Kubernetes API with your own resource types—operators use CRDs to define resources like PostgresCluster, Kafka, etc.
+- Once CRD exists, you can `oc get postgresclusters` just like built-in resources. API server validates against CRD schema
 
 ### Why It Is Used
-- Enables operators and controllers to manage domain-specific resources declaratively.
+- Operators need custom resources to manage. Without CRD, there's no PostgresCluster resource type for the operator to watch.
 
 ### Use Cases
-- Creating custom application configurations
-- Defining operator-managed resources
+- Debugging "resource type not found": CRD not installed or not in the expected API group
+- Viewing all custom resources in cluster: `oc get crds` shows what operators have installed
 
 ### Important CLI Commands
 ```bash
@@ -2293,15 +2288,15 @@ spec:
 ## Authentication
 
 ### Definition
-- Cluster-wide authentication configuration specifying identity providers
-- Managed via OAuth cluster resource
+- Cluster-wide config for how users prove their identity—LDAP, OIDC, HTPasswd, whatever your org uses
+- Configured via the OAuth cluster resource. Change it, and authentication-operator rolls out the changes
 
 ### Why It Is Used
-- Configures how users authenticate to the cluster (LDAP, OIDC, HTPasswd, etc.).
+- Integration with corporate identity: users login with AD credentials, not separate OpenShift passwords.
 
 ### Use Cases
-- Integrating with corporate LDAP/Active Directory
-- Configuring OIDC for SSO
+- LDAP integration: users authenticate against Active Directory, groups sync automatically
+- OIDC for SSO: integrate with Okta/Azure AD, users get seamless login across all tools
 
 ### Important CLI Commands
 ```bash
@@ -2343,15 +2338,15 @@ spec:
 ## OAuth
 
 ### Definition
-- OpenShift OAuth server configuration for token-based authentication
-- Manages token lifetimes, grant methods, and identity providers
+- Controls token policies and identity provider configuration—token lifetime, inactivity timeout, which IdPs are enabled
+- The authentication-operator manages the OAuth server pods based on this config
 
 ### Why It Is Used
-- Controls OAuth token policies and integrates external identity providers.
+- Security compliance: "tokens must expire after 8 hours" or "inactive sessions timeout after 1 hour."
 
 ### Use Cases
-- Configuring token expiration policies
-- Setting up multiple identity providers
+- Reducing token lifetime for security-sensitive clusters
+- Multiple IdPs: HTPasswd for break-glass admin, LDAP for regular users, OIDC for contractors
 
 ### Important CLI Commands
 ```bash
@@ -2386,15 +2381,15 @@ spec:
 ## FeatureGates
 
 ### Definition
-- Controls enablement of alpha/beta Kubernetes and OpenShift features
-- Applied cluster-wide via FeatureGate resource
+- Toggle switches for alpha/beta features—enable tech preview features or disable deprecated APIs
+- Warning: TechPreviewNoUpgrade literally means "enable this and you can't upgrade." Use carefully
 
 ### Why It Is Used
-- Enables early access to new features or disables deprecated functionality.
+- Early access to features before GA, or disabling deprecated APIs to prepare for future versions.
 
 ### Use Cases
-- Enabling tech preview features
-- Disabling deprecated APIs before upgrade
+- Testing new features in non-prod before they GA
+- Rare: enabling specific feature gates required by certain workloads (usually not needed)
 
 ### Important CLI Commands
 ```bash
@@ -2430,15 +2425,15 @@ spec:
 ## Schedulers
 
 ### Definition
-- Cluster-wide scheduler configuration for pod placement policies
-- Controls default scheduling profiles and predicates
+- Controls how pods get placed on nodes—profiles, predicates, default node selectors
+- Scheduler config is cluster-wide; affects every pod scheduling decision
 
 ### Why It Is Used
-- Customizes pod scheduling behavior across the cluster.
+- Customizing scheduling behavior: prefer certain nodes, spread pods across zones, pack nodes tightly.
 
 ### Use Cases
-- Configuring scheduler profiles for different workload types
-- Enabling topology-aware scheduling
+- HighNodeUtilization profile to pack nodes tightly (save cost) vs LowNodeUtilization (spread for resilience)
+- Default node selector ensuring all pods land on worker nodes, not accidentally on infra or master
 
 ### Important CLI Commands
 ```bash
@@ -2467,15 +2462,15 @@ spec:
 ## Proxies
 
 ### Definition
-- Cluster-wide proxy configuration for egress traffic
-- Configures HTTP/HTTPS proxy and no-proxy settings
+- Cluster-wide egress proxy configuration—all cluster components and workloads route through corporate proxy for internet access
+- Set httpProxy, httpsProxy, and noProxy (critical: include your internal domains in noProxy)
 
 ### Why It Is Used
-- Routes cluster egress traffic through corporate proxy for internet access.
+- Enterprise requirement: all internet traffic goes through proxy for inspection/logging. Without this config, cluster can't pull images or reach external services.
 
 ### Use Cases
-- Configuring cluster to use corporate proxy
-- Excluding internal domains from proxy
+- Corporate proxy setup: cluster routes through proxy.corp.com:3128 for external access
+- noProxy tuning: exclude internal registries, cluster network CIDRs, and service domains from proxy
 
 ### Important CLI Commands
 ```bash
