@@ -4,6 +4,90 @@
 
 ---
 
+## Table of Contents
+
+### Overview
+- [Overview](#overview-1)
+- [Dashboards](#dashboards)
+
+### Compute
+- [Nodes](#nodes)
+- [Machines](#machines)
+- [MachineSets](#machinesets)
+- [MachineConfigs](#machineconfigs)
+
+### Workloads
+- [Pods](#pods)
+- [Deployments](#deployments)
+- [DeploymentConfigs](#deploymentconfigs)
+- [ReplicaSets](#replicasets)
+- [ReplicationControllers](#replicationcontrollers)
+- [StatefulSets](#statefulsets)
+- [DaemonSets](#daemonsets)
+- [Jobs](#jobs)
+- [CronJobs](#cronjobs)
+- [PodDisruptionBudgets](#poddisruptionbudgets)
+
+### Networking
+- [Services](#services)
+- [Routes](#routes)
+- [Ingresses](#ingresses)
+- [NetworkPolicies](#networkpolicies)
+- [Endpoints](#endpoints)
+
+### Storage
+- [PersistentVolumes](#persistentvolumes)
+- [PersistentVolumeClaims](#persistentvolumeclaims)
+- [StorageClasses](#storageclasses)
+- [VolumeSnapshots](#volumesnapshots)
+
+### Builds
+- [BuildConfigs](#buildconfigs)
+- [Builds](#builds)
+
+### Images
+- [ImageStreams](#imagestreams)
+- [ImageStreamTags](#imagestreamtags)
+- [ImageStreamImages](#imagestreamimages)
+
+### User Management
+- [Users](#users)
+- [Groups](#groups)
+- [Roles](#roles)
+- [RoleBindings](#rolebindings)
+- [ClusterRoles](#clusterroles)
+- [ClusterRoleBindings](#clusterrolebindings)
+- [ServiceAccounts](#serviceaccounts)
+
+### Administration
+- [Projects](#projects)
+- [Namespaces](#namespaces)
+- [LimitRanges](#limitranges)
+- [ResourceQuotas](#resourcequotas)
+- [Events](#events)
+
+### Operators
+- [Installed Operators](#installed-operators)
+- [OperatorHub](#operatorhub)
+- [Subscriptions](#subscriptions)
+- [CatalogSources](#catalogsources)
+- [ClusterServiceVersions](#clusterserviceversions)
+
+### Custom Resources
+- [CustomResourceDefinitions](#customresourcedefinitions)
+
+### Cluster Configuration
+- [Authentication](#authentication)
+- [OAuth](#oauth)
+- [FeatureGates](#featuregates)
+- [Schedulers](#schedulers)
+- [Proxies](#proxies)
+
+### Quick Reference
+- [Quick Reference Commands](#quick-reference-commands)
+
+---
+
 # Overview
 
 ## Overview
