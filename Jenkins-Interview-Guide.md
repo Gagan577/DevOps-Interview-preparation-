@@ -22,6 +22,85 @@ This guide contains **50 carefully crafted scenario-based Jenkins interview ques
 
 ---
 
+## 📚 Table of Contents
+
+### [Section 1: Jenkins Basics & Architecture (Q1–Q10)](#section-1-jenkins-basics--architecture-q1q10)
+
+| # | Question | Key Topic |
+|---|----------|-----------|
+| [Q1](#q1-your-team-just-started-using-jenkins-the-manager-asks-you-to-explain-how-jenkins-works-internally-how-would-you-describe-the-jenkins-architecture) | Jenkins Architecture Explanation | Master-Agent Architecture |
+| [Q2](#q2-a-developer-complains-that-their-build-is-stuck-in-the-queue-for-too-long-what-could-be-the-reason-and-how-would-you-troubleshoot) | Build Stuck in Queue | Executors & Troubleshooting |
+| [Q3](#q3-you-need-to-install-jenkins-on-a-new-linux-server-walk-me-through-the-installation-and-initial-setup-process) | Jenkins Installation on Linux | Installation & Setup |
+| [Q4](#q4-what-is-the-difference-between-a-freestyle-job-and-a-pipeline-job-when-would-you-use-each) | Freestyle vs Pipeline Jobs | Job Types |
+| [Q5](#q5-jenkins-build-failed-with-abortedjabortedjabortedjoutofmemoryerror-java-heap-space-how-do-you-fix-this) | OutOfMemoryError Fix | JVM Memory Tuning |
+| [Q6](#q6-how-do-you-configure-jenkins-to-automatically-trigger-a-build-when-code-is-pushed-to-github) | Auto-trigger Builds from GitHub | Webhooks & SCM Polling |
+| [Q7](#q7-a-build-works-on-one-agent-but-fails-on-another-with-command-not-found-how-do-you-ensure-consistent-build-environments) | Command Not Found on Agent | Environment Consistency |
+| [Q8](#q8-how-do-you-pass-parameters-to-a-jenkins-job-and-use-them-in-the-build) | Parameterized Builds | Job Parameters |
+| [Q9](#q9-jenkins-build-logs-are-growing-very-large-and-consuming-disk-space-how-do-you-manage-this) | Disk Space & Log Management | Build Retention |
+| [Q10](#q10-how-do-you-backup-and-restore-jenkins-configuration) | Backup & Restore Jenkins | Disaster Recovery |
+
+### Section 2: Jenkins Jobs, Pipelines & Groovy (Q11–Q20) — *Coming Soon*
+
+| # | Question | Key Topic |
+|---|----------|-----------|
+| Q11 | Declarative vs Scripted Pipeline | Pipeline Syntax |
+| Q12 | Shared Libraries Setup | Code Reusability |
+| Q13 | Multi-branch Pipeline | Branch Management |
+| Q14 | Pipeline Stages & Parallel Execution | Performance |
+| Q15 | Jenkinsfile Best Practices | Code Quality |
+| Q16 | Groovy Sandbox Restrictions | Security |
+| Q17 | Post Actions & Notifications | Build Feedback |
+| Q18 | Credentials in Pipelines | Secrets Management |
+| Q19 | Triggering Downstream Jobs | Job Orchestration |
+| Q20 | Pipeline Input & Approval Gates | Manual Intervention |
+
+### Section 3: CI/CD Design & Real DevOps Scenarios (Q21–Q30) — *Coming Soon*
+
+| # | Question | Key Topic |
+|---|----------|-----------|
+| Q21 | Complete CI/CD Pipeline Design | End-to-End Flow |
+| Q22 | Blue-Green Deployment | Zero-Downtime Deploy |
+| Q23 | Canary Releases with Jenkins | Progressive Rollout |
+| Q24 | Database Migrations in Pipeline | Data Management |
+| Q25 | Container Build & Push | Docker Integration |
+| Q26 | Kubernetes Deployment | K8s CI/CD |
+| Q27 | Artifact Management | Nexus/Artifactory |
+| Q28 | Environment Promotion Strategy | Dev→Staging→Prod |
+| Q29 | Rollback Strategies | Failure Recovery |
+| Q30 | Monorepo CI/CD | Large Codebases |
+
+### Section 4: Jenkins Administration, Security & Scaling (Q31–Q40) — *Coming Soon*
+
+| # | Question | Key Topic |
+|---|----------|-----------|
+| Q31 | RBAC & Folder Permissions | Access Control |
+| Q32 | LDAP/AD Integration | Authentication |
+| Q33 | Securing Jenkins Credentials | Secrets Protection |
+| Q34 | Plugin Management Strategy | Maintenance |
+| Q35 | Jenkins High Availability | HA Setup |
+| Q36 | Horizontal Scaling with Agents | Scaling |
+| Q37 | Kubernetes-based Dynamic Agents | Cloud Agents |
+| Q38 | Jenkins Performance Tuning | Optimization |
+| Q39 | Audit Logging & Compliance | Governance |
+| Q40 | Upgrading Jenkins Safely | Version Management |
+
+### Section 5: Advanced Jenkins, Debugging & Production Issues (Q41–Q50) — *Coming Soon*
+
+| # | Question | Key Topic |
+|---|----------|-----------|
+| Q41 | Pipeline Hanging / Stuck Builds | Debugging |
+| Q42 | Agent Connection Failures | Connectivity |
+| Q43 | Plugin Conflicts & Crashes | Troubleshooting |
+| Q44 | Slow Pipeline Diagnosis | Performance Debug |
+| Q45 | Git Checkout Failures | SCM Issues |
+| Q46 | Workspace Corruption | File System |
+| Q47 | Memory Leaks in Jenkins | Resource Monitoring |
+| Q48 | Migration to New Jenkins Server | Infrastructure |
+| Q49 | Jenkins in Air-Gapped Environment | Offline Setup |
+| Q50 | Designing Jenkins for Enterprise | Architecture |
+
+---
+
 ## Section 1: Jenkins Basics & Architecture (Q1–Q10)
 
 ---
