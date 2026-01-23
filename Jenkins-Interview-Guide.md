@@ -24,20 +24,20 @@ This guide contains **50 carefully crafted scenario-based Jenkins interview ques
 
 ## 📚 Table of Contents
 
-### [Section 1: Jenkins Basics & Architecture (Q1–Q10)](#section-1-jenkins-basics--architecture-q1q10)
+### [Section 1: Jenkins Basics & Architecture (Q1–Q10)](#section-1-jenkins-basics--architecture-q1q10-1)
 
 | # | Question | Key Topic |
 |---|----------|-----------|
-| [Q1](#q1-your-team-just-started-using-jenkins-the-manager-asks-you-to-explain-how-jenkins-works-internally-how-would-you-describe-the-jenkins-architecture) | Jenkins Architecture Explanation | Master-Agent Architecture |
-| [Q2](#q2-a-developer-complains-that-their-build-is-stuck-in-the-queue-for-too-long-what-could-be-the-reason-and-how-would-you-troubleshoot) | Build Stuck in Queue | Executors & Troubleshooting |
-| [Q3](#q3-you-need-to-install-jenkins-on-a-new-linux-server-walk-me-through-the-installation-and-initial-setup-process) | Jenkins Installation on Linux | Installation & Setup |
-| [Q4](#q4-what-is-the-difference-between-a-freestyle-job-and-a-pipeline-job-when-would-you-use-each) | Freestyle vs Pipeline Jobs | Job Types |
-| [Q5](#q5-jenkins-build-failed-with-abortedjabortedjabortedjoutofmemoryerror-java-heap-space-how-do-you-fix-this) | OutOfMemoryError Fix | JVM Memory Tuning |
-| [Q6](#q6-how-do-you-configure-jenkins-to-automatically-trigger-a-build-when-code-is-pushed-to-github) | Auto-trigger Builds from GitHub | Webhooks & SCM Polling |
-| [Q7](#q7-a-build-works-on-one-agent-but-fails-on-another-with-command-not-found-how-do-you-ensure-consistent-build-environments) | Command Not Found on Agent | Environment Consistency |
-| [Q8](#q8-how-do-you-pass-parameters-to-a-jenkins-job-and-use-them-in-the-build) | Parameterized Builds | Job Parameters |
-| [Q9](#q9-jenkins-build-logs-are-growing-very-large-and-consuming-disk-space-how-do-you-manage-this) | Disk Space & Log Management | Build Retention |
-| [Q10](#q10-how-do-you-backup-and-restore-jenkins-configuration) | Backup & Restore Jenkins | Disaster Recovery |
+| [Q1](#q1) | Jenkins Architecture Explanation | Master-Agent Architecture |
+| [Q2](#q2) | Build Stuck in Queue | Executors & Troubleshooting |
+| [Q3](#q3) | Jenkins Installation on Linux | Installation & Setup |
+| [Q4](#q4) | Freestyle vs Pipeline Jobs | Job Types |
+| [Q5](#q5) | OutOfMemoryError Fix | JVM Memory Tuning |
+| [Q6](#q6) | Auto-trigger Builds from GitHub | Webhooks & SCM Polling |
+| [Q7](#q7) | Command Not Found on Agent | Environment Consistency |
+| [Q8](#q8) | Parameterized Builds | Job Parameters |
+| [Q9](#q9) | Disk Space & Log Management | Build Retention |
+| [Q10](#q10) | Backup & Restore Jenkins | Disaster Recovery |
 
 ### Section 2: Jenkins Jobs, Pipelines & Groovy (Q11–Q20) — *Coming Soon*
 
@@ -105,6 +105,7 @@ This guide contains **50 carefully crafted scenario-based Jenkins interview ques
 
 ---
 
+<a id="q1"></a>
 ### Q1. Your team just started using Jenkins. The manager asks you to explain how Jenkins works internally. How would you describe the Jenkins architecture?
 
 **Scenario / Problem Statement**
@@ -155,6 +156,7 @@ Jenkins follows a **Master-Agent architecture**:
 
 ---
 
+<a id="q2"></a>
 ### Q2. A developer complains that their build is stuck in the queue for too long. What could be the reason and how would you troubleshoot?
 
 **Scenario / Problem Statement**
@@ -208,6 +210,7 @@ pipeline {
 
 ---
 
+<a id="q3"></a>
 ### Q3. You need to install Jenkins on a new Linux server. Walk me through the installation and initial setup process.
 
 **Scenario / Problem Statement**
@@ -264,6 +267,7 @@ sudo cat /var/lib/jenkins/secrets/initialAdminPassword
 
 ---
 
+<a id="q4"></a>
 ### Q4. What is the difference between a Freestyle job and a Pipeline job? When would you use each?
 
 **Scenario / Problem Statement**
@@ -329,6 +333,7 @@ pipeline {
 
 ---
 
+<a id="q5"></a>
 ### Q5. Jenkins build failed with "java.lang.OutOfMemoryError: Java heap space". How do you fix this?
 
 **Scenario / Problem Statement**
@@ -383,6 +388,7 @@ top -p $(pgrep -f jenkins)
 
 ---
 
+<a id="q6"></a>
 ### Q6. How do you configure Jenkins to automatically trigger a build when code is pushed to GitHub?
 
 **Scenario / Problem Statement**
@@ -442,6 +448,7 @@ pipeline {
 
 ---
 
+<a id="q7"></a>
 ### Q7. A build works on one agent but fails on another with "command not found". How do you ensure consistent build environments?
 
 **Scenario / Problem Statement**
@@ -510,6 +517,7 @@ agent { label 'nodejs-18' }
 
 ---
 
+<a id="q8"></a>
 ### Q8. How do you pass parameters to a Jenkins job and use them in the build?
 
 **Scenario / Problem Statement**
@@ -581,6 +589,7 @@ pipeline {
 
 ---
 
+<a id="q9"></a>
 ### Q9. Jenkins build logs are growing very large and consuming disk space. How do you manage this?
 
 **Scenario / Problem Statement**
@@ -650,6 +659,7 @@ find /var/lib/jenkins/jobs/*/builds -maxdepth 1 -type d -mtime +30 -exec rm -rf 
 
 ---
 
+<a id="q10"></a>
 ### Q10. How do you backup and restore Jenkins configuration?
 
 **Scenario / Problem Statement**
